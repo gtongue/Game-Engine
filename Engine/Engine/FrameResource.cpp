@@ -2,7 +2,7 @@
 
 
 
-FrameResource::FrameResource(ID3D12Device* device, UINT passCount, UINT objectCount, UINT materialCount)
+FrameResource::FrameResource(ID3D12Device* device, UINT passCount)
 {
 	ThrowIfFailed(device->CreateCommandAllocator(
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -10,8 +10,8 @@ FrameResource::FrameResource(ID3D12Device* device, UINT passCount, UINT objectCo
 
 	//  FrameCB = std::make_unique<UploadBuffer<FrameConstants>>(device, 1, true);
 
-	UINT maxObjects = 99;
-	UINT maxMaterials = 99;
+	UINT maxObjects = 9999;
+	UINT maxMaterials = 9999;
 
 	PassCB = std::make_unique<UploadBuffer<PassConstants>>(device, passCount, true);
 	//MaterialCB = std::make_unique<UploadBuffer<MaterialConstants>>(device, materialCount, true);

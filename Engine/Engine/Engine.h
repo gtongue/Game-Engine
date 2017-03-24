@@ -57,14 +57,13 @@ private:
 	bool InitNewScene(Scene& scene);
 	bool ResetScene();
 
-	virtual void BuildConstantBufferViews();
-
 	void BuildRootSignature(Scene& scene);
 	void BuildDescriptorHeaps(Scene& scene);
 	void BuildShadersAndInputLayout(Scene& scene);
 	void BuildFrameResources(Scene& scene);
 	void BuildPSOs(Scene& scene);
-	void BuildRenderItems(Scene& scene);
+	void BuildWorldObjects(Scene& scene);
+	std::unique_ptr<RenderItem> BuildRenderItem(ObjectSkeleton skel, int ObjNumber);
 	void BuildGeometry(Scene& scene);
 	void BuildMaterials(Scene& scene);
 	void BuildTextures(Scene& scene);
@@ -78,8 +77,7 @@ private:
 	void UpdateMainPassCB();
 	void UpdateMaterialPassCBs();
 	virtual void Draw();
-	virtual void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems);
-	void DrawBoundingBoxes(ID3D12GraphicsCommandList* cmdList, const std::vector<Object*>& objects);
+	void DrawWorldItems(ID3D12GraphicsCommandList* cmdList);
 
 	ID3D12Resource* CurrentBackBuffer()const;
 	D3D12_CPU_DESCRIPTOR_HANDLE CurrentBackBufferView()const;
@@ -112,14 +110,16 @@ private:
 	std::unordered_map<std::string, std::unique_ptr<Texture>> mTextures;
 
 	// List of all the render items.
-	std::vector<std::unique_ptr<RenderItem>> mAllRitems;
+/*	std::vector<std::unique_ptr<RenderItem>> mAllRitems;
 	std::vector<std::unique_ptr<PhysicsObject>> mAllPhysicsObjects;
 	std::vector<std::unique_ptr<Object>> mAllObjects; //TODO 
 	std::vector<RenderItem*> mOpaqueRitems;
 	std::vector<Object*> mCurrentObjects;
 	std::vector<RenderItem*> mBoundingBoxes;
 
-	Object* mPickedObject = nullptr;
+	Object* mPickedObject = nullptr;*/
+	std::vector<std::unique_ptr<WorldObject>> mWorldObjects;
+
 	std::unique_ptr<Scene> mScene = nullptr;
 
 	// Render items divided by PSO. Right now Only opaque
@@ -172,7 +172,7 @@ private:
 	XMFLOAT4X4 mView = MathUtils::Identity4x4();
 	XMFLOAT4X4 mProj = MathUtils::Identity4x4();
 	GameTimer mTimer;
-	PhysicsEngine mPhysicsEngine;
+//	PhysicsEngine mPhysicsEngine;
 
 	float mTheta = 1.5f*XM_PI;
 	float mPhi = XM_PIDIV2 - 0.1f;

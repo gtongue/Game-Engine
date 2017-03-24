@@ -1,7 +1,7 @@
 #pragma once
 #include "D3DUtils.h"
 #include "Structures.h"
-
+/*
 class PhysicsEngine
 {
 public:
@@ -19,4 +19,4 @@ private:
 	void AdjustPosition(Object* object, float x, float y, float z);
 	void CheckVelocity(PhysicsObject* object);
 	bool CheckCollision(PhysicsObject* objectOne, PhysicsObject* objectTwo);
-};
+};*/

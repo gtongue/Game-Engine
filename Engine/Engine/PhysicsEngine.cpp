@@ -1,5 +1,5 @@
 #include "PhysicsEngine.h"
-
+/*
 PhysicsEngine::~PhysicsEngine()
 {
 }
@@ -188,3 +188,4 @@ bool PhysicsEngine::CheckCollision(PhysicsObject* objectOne, PhysicsObject* obje
 		return true;
 	return false;
 }
+*/

@@ -10,13 +10,13 @@ Loader::~Loader()
 {
 }
 
-void Loader::LoadModel(vector<Vertex>& vertices, vector<uint32_t>& indices, int& vertexCount, int& triangleCount, string filename)
+void Loader::LoadModel(vector<Vertex>& vertices, vector<uint32_t>& indices, string filename)
 {
 	ifstream fin;
 	GetModelFilename(filename, fin);
 	int currOffset = 0;
 	while (!fin.eof()) {
-		ReadFileCounts(vertexCount, triangleCount, fin);
+		ReadFileCounts(fin);
 		ReadFileVertices(vertices, fin);
 		ReadFileIndices(indices, fin, currOffset);
 	}
@@ -132,16 +132,16 @@ Scene Loader::LoadScene(string filename)
 		line = line.substr(line.find(',') + 1);
 
 		PhysicsObject po;
-		po.mass = stof(line.substr(0, line.find(',')));
+		po.Mass = stof(line.substr(0, line.find(',')));
 		line = line.substr(line.find(',') + 1);
 
-		po.restitution = stof(line.substr(0, line.find(',')));
+		po.Restitution = stof(line.substr(0, line.find(',')));
 		line = line.substr(line.find(',') + 1);
 
-		po.friction = stof(line.substr(0, line.find(',')));
+		po.Friction = stof(line.substr(0, line.find(',')));
 		line = line.substr(line.find(',') + 1);
 
-		po.mass = stof(line.substr(0, line.find(',')));
+		po.Mass = stof(line.substr(0, line.find(',')));
 		line = line.substr(line.find(',') + 1);
 
 		po.isConstant = stoi(line.substr(0, line.find(',')));
@@ -155,7 +155,7 @@ Scene Loader::LoadScene(string filename)
 		y = stof(line.substr(0, line.find(',')));
 		line = line.substr(line.find(',') + 1);
 		z = stof(line);
-		po.velocity = XMFLOAT3(x, y, z);
+		po.Velocity = XMFLOAT3(x, y, z);
 
 		obj.po = po;
 
@@ -409,7 +409,8 @@ void Loader::ReadFileVertices(vector<Vertex>& vertices, ifstream& fin)
 		}
 	}
 }
-void Loader::ReadFileCounts(int& vertexCount, int& triangleCount, ifstream& fin)
+//TODO no longer needed redo loading in model format
+void Loader::ReadFileCounts(ifstream& fin)
 {
 	string line;
 	while (getline(fin, line))
@@ -419,7 +420,7 @@ void Loader::ReadFileCounts(int& vertexCount, int& triangleCount, ifstream& fin)
 
 		if (line.find(findVert) != string::npos) {
 			try {
-				vertexCount = std::stoi(line.substr(findVert.length()));
+				std::stoi(line.substr(findVert.length()));
 			}
 			catch (exception e) {
 				cout << "vertexCount RIP";
@@ -428,7 +429,7 @@ void Loader::ReadFileCounts(int& vertexCount, int& triangleCount, ifstream& fin)
 		}
 		else if (line.find(findTriangle) != string::npos) {
 			try {
-				triangleCount = std::stoi(line.substr(findTriangle.length()));
+				 std::stoi(line.substr(findTriangle.length()));
 			}
 			catch (exception e) {
 				cout << "triangleCount RIP";

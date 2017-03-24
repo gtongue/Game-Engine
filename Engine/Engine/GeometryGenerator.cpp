@@ -10,7 +10,7 @@ GeometryGenerator::GeometryGenerator()
 GeometryGenerator::~GeometryGenerator()
 {
 }
-void GeometryGenerator::GenerateGridMesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, uint16 width, uint16 height, float offset)
+void GeometryGenerator::GenerateGridMesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, uint16_t width, uint16_t height, float offset)
 {
 	for (int i = 0; i < width; ++i)
 	{
@@ -38,7 +38,7 @@ void GeometryGenerator::GenerateGridMesh(std::vector<Vertex>& vertices, std::vec
 	}
 }
 
-void GeometryGenerator::GenerateGridMeshPoly(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, uint16 width, uint16 height, float offset)
+void GeometryGenerator::GenerateGridMeshPoly(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, uint16_t width, uint16_t height, float offset)
 {
 	int vertCount = 0;
 	for (int i = 0; i < width-1; ++i)

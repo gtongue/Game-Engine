@@ -131,6 +131,7 @@ bool Engine::InitNewScene(Scene & scene)
 {
 //	mSwapChain->SetFullscreenState(true, NULL);
 	//OnResize(); TODO
+
 	mCamera.LookAt(
 		XMFLOAT3(5.0f, 4.0f, -15.0f),
 		XMFLOAT3(0.0f, 1.0f, 0.0f),
@@ -145,19 +146,22 @@ bool Engine::InitNewScene(Scene & scene)
 	BuildShadersAndInputLayout(scene);
 	BuildGeometry(scene);
 	BuildMaterials(scene);
-	BuildRenderItems(scene);
+	BuildWorldObjects(scene);
 	BuildFrameResources(scene);
 	BuildPSOs(scene);
-
 	ThrowIfFailed(mCommandList->Close());
+
 	ID3D12CommandList* cmdsLists[] = { mCommandList.Get() };
 	mCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 	FlushCommandQueue();
+
 	mScene = std::make_unique<Scene>(scene);
-	for (auto& obj : mAllObjects)
+
+	for (auto& obj : mWorldObjects)
 	{
-		obj->InitPhysicsBounds();
+		//obj->InitPhysicsBounds(); TODO physics bounds
 	}
+	
 	return true;
 }
 
@@ -187,57 +191,10 @@ bool Engine::ResetScene()
 	mTextures.clear();
 	mGeometries.clear();
 	mMaterials.clear();
-	mAllObjects.clear();
-	mCurrentObjects.clear();
-	mOpaqueRitems.clear();
+	mWorldObjects.clear();
 	mFrameResources.clear();
 	mPSOs.clear();
 	return true;
-}
-
-void Engine::BuildConstantBufferViews()
-{
-	UINT objCBByteSize = D3DUtils::CalcConstantBufferByteSize(sizeof(ObjectConstants));
-	UINT objCount = (UINT)mOpaqueRitems.size();
-
-	for (int frameIndex = 0; frameIndex < mNumFrameResources; ++frameIndex)
-	{
-		auto objectCB = mFrameResources[frameIndex]->ObjectCB->Resource();
-		for (UINT i = 0; i < objCount; ++i)
-		{
-			D3D12_GPU_VIRTUAL_ADDRESS cbAddress = objectCB->GetGPUVirtualAddress();
-
-			// Offset to the ith object constant buffer in the buffer.
-			cbAddress += i*objCBByteSize;
-			// Offset to the object cbv in the descriptor heap.
-			int heapIndex = frameIndex*objCount + i;
-			auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvHeap->GetCPUDescriptorHandleForHeapStart());
-			handle.Offset(heapIndex, mCbvSrvUavDescriptorSize);
-			D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
-			cbvDesc.BufferLocation = cbAddress;
-			cbvDesc.SizeInBytes = objCBByteSize;
-
-			md3dDevice->CreateConstantBufferView(&cbvDesc, handle);
-		}
-	}
-	UINT passCBByteSize = D3DUtils::CalcConstantBufferByteSize(sizeof(PassConstants));
-
-	for (int frameIndex = 0; frameIndex < mNumFrameResources; ++frameIndex)
-	{
-		auto passCB = mFrameResources[frameIndex]->PassCB->Resource();
-		D3D12_GPU_VIRTUAL_ADDRESS cbAddress = passCB->GetGPUVirtualAddress();
-
-		// Offset to the pass cbv in the descriptor heap.
-		int heapIndex = mPassCbvOffset + frameIndex;
-		auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvHeap->GetCPUDescriptorHandleForHeapStart());
-		handle.Offset(heapIndex, mCbvSrvUavDescriptorSize);
-
-		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
-		cbvDesc.BufferLocation = cbAddress;
-		cbvDesc.SizeInBytes = passCBByteSize;
-
-		md3dDevice->CreateConstantBufferView(&cbvDesc, handle);
-	}
 }
 
 void Engine::BuildRootSignature(Scene & scene)
@@ -313,7 +270,7 @@ void Engine::BuildFrameResources(Scene & scene)
 {
 	for (int i = 0; i < mNumFrameResources; ++i)
 	{
-		mFrameResources.push_back(std::make_unique<FrameResource>(md3dDevice.Get(), 1, (UINT)mAllObjects.size(), (UINT)mMaterials.size()));
+		mFrameResources.push_back(std::make_unique<FrameResource>(md3dDevice.Get(), 1));
 	}
 }
 
@@ -352,37 +309,37 @@ void Engine::BuildPSOs(Scene & scene)
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaqueWireframePsoDesc, IID_PPV_ARGS(&mPSOs["opaque_wireframe"])));
 }
 
-void Engine::BuildRenderItems(Scene & scene)
+void Engine::BuildWorldObjects(Scene & scene)
 {
 	for (int i = 0; i < scene.objects.size(); ++i)
 	{
-		auto skel = &scene.objects[i];
-		auto rItem = std::make_unique<RenderItem>(mNumFrameResources);
-		XMStoreFloat4x4(&rItem->World, XMMatrixRotationRollPitchYaw(skel->rotation.x*XM_PI / 180, skel->rotation.y*XM_PI/180, skel->rotation.z*XM_PI / 180 )*XMMatrixScaling(skel->scale.x, skel->scale.y, skel->scale.z)*XMMatrixTranslation(skel->pos.x, skel->pos.y, skel->pos.z));
-		XMStoreFloat4x4(&rItem->TexTransform, XMMatrixScaling(skel->texTrans.x, skel->texTrans.y, skel->texTrans.z));
-		rItem->ObjCBIndex = i;
-		rItem->Geo = mGeometries[skel->geoName].get();
-		rItem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		rItem->Mat = mMaterials[skel->matName].get();
-		rItem->IndexCount = rItem->Geo->IndexCount;
-		rItem->StartIndexLocation = 0;
-		rItem->BaseVertexLocation = 0;
-		auto obj = std::make_unique<PhysicsObject>(skel->po);
-		auto o = std::make_unique<Object>();
-		o->po = std::move(obj);
-		o->ri = std::move(rItem);
-		mAllObjects.push_back(std::move(o));
-	}
-	for (auto& e : mAllObjects)
-	{
-		mCurrentObjects.push_back(e.get());
-		mOpaqueRitems.push_back(e->ri.get());
+		auto skel = scene.objects[i];
+		auto worldObject = std::make_unique<WorldObject>();
+		worldObject->pos = skel.pos;
+		worldObject->rotation = skel.rotation;
+		worldObject->scale = skel.scale;
+		worldObject->texScale = skel.texTrans; //TODO
+		worldObject->ri = std::move(BuildRenderItem(skel, i));
+		worldObject->po = std::move(std::make_unique<PhysicsObject>(skel.po));
+		worldObject->UpdateTexTransform();
+		worldObject->UpdateWorld();
+		mWorldObjects.push_back(std::move(worldObject));
 	}
 }
+std::unique_ptr<RenderItem> Engine::BuildRenderItem(ObjectSkeleton skel, int ObjNumber)
+{
+	auto rItem = std::make_unique<RenderItem>(mNumFrameResources);
+	rItem->ObjCBIndex = ObjNumber;
+	rItem->Geo = mGeometries[skel.geoName].get();
+	rItem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	rItem->Mat = mMaterials[skel.matName].get();
+	return rItem;
+}
+
 
 void Engine::AddRenderItem()
 {
-	for (int i = 0; i < 1; ++i)
+	/*	for (int i = 0; i < 1; ++i)
 	{
 		auto skel = &mScene->objects[i];
 		auto rItem = std::make_unique<RenderItem>(mNumFrameResources);
@@ -408,83 +365,54 @@ void Engine::AddRenderItem()
 		mCurrentObjects.push_back(o.get());
 		mOpaqueRitems.push_back(o->ri.get());
 		mAllObjects.push_back(std::move(o));
-	}
+	}*/
 }
 void Engine::BuildGeometry(Scene & scene)
 {
 	for (auto modelName : scene.modelNames)
 	{
-		auto totalVertexCount = 0;
-
-		MeshData tempMesh;
-		int vertexCount, indicesCount; //TODO
+		MeshData mesh;
 		if (modelName != "mesh") {
-			string filename = "Models/" + modelName;
-			Loader::LoadModel(tempMesh.Vertices, tempMesh.Indices32, vertexCount, indicesCount, filename);
+			Loader::LoadModel(mesh.Vertices, mesh.Indices32, "Models/" + modelName);
 		}
-		else {
-			GeometryGenerator::GenerateGridMeshPoly(tempMesh.Vertices, tempMesh.Indices32, 500, 500, 10.0f);
-		}
-		UINT vertOffset = 0;
-		UINT indOffset = 0;
-		
-		SubmeshGeometry tempSubMesh;
-		tempSubMesh.IndexCount = (UINT)tempMesh.Indices32.size();
-		tempSubMesh.StartIndexLocation = vertOffset;
-		tempSubMesh.BaseVertexLocation = indOffset;
-		totalVertexCount = (UINT)tempMesh.Vertices.size();//NOTE
 
-		std::vector<Vertex> vertices(totalVertexCount);
-		//TODO BOUNDS
+		else {
+			GeometryGenerator::GenerateGridMeshPoly(mesh.Vertices, mesh.Indices32, 500, 500, 10.0f);
+		}
+
 		XMFLOAT3 vMinf3(+MathUtils::Infinity, +MathUtils::Infinity, +MathUtils::Infinity);
 		XMFLOAT3 vMaxf3(-MathUtils::Infinity, -MathUtils::Infinity, -MathUtils::Infinity);
 		XMVECTOR vMin = XMLoadFloat3(&vMinf3);
 		XMVECTOR vMax = XMLoadFloat3(&vMaxf3);
-
-		UINT k = 0;
-		for (size_t i = 0; i < tempMesh.Vertices.size(); ++i, ++k)
+		for (size_t i = 0; i < mesh.Vertices.size(); ++i)
 		{
-			vertices[k].Pos = tempMesh.Vertices[i].Pos;
-			vertices[k].Normal = tempMesh.Vertices[i].Normal;
-			vertices[k].TexC = tempMesh.Vertices[i].TexC;
-
-			XMVECTOR P = XMLoadFloat3(&vertices[i].Pos);
-
+			XMVECTOR P = XMLoadFloat3(&mesh.Vertices[i].Pos);
 			vMin = XMVectorMin(vMin, P);
 			vMax = XMVectorMax(vMax, P);
 		}
-
 		BoundingBox bounds;
 		XMStoreFloat3(&bounds.Center, 0.5f*(vMin + vMax));
 		XMStoreFloat3(&bounds.Extents, 0.5f*(vMax - vMin));
-
-
-		std::vector<std::uint32_t> indices;
-		indices.insert(indices.end(), std::begin(tempMesh.Indices32), std::end(tempMesh.Indices32));
-		const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
-		const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint32_t);
-
-
+		const UINT vbByteSize = (UINT)mesh.Vertices.size() * sizeof(Vertex);
+		const UINT ibByteSize = (UINT)mesh.Indices32.size() * sizeof(std::uint32_t);
 		auto geo = std::make_unique<MeshGeometry>();
 		geo->Name = modelName;
 
 		ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
-		CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
-
+		CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), mesh.Vertices.data(), vbByteSize);
 		ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
-		CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+		CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), mesh.Indices32.data(), ibByteSize);
 
 		geo->VertexBufferGPU = D3DUtils::CreateDefaultBuffer(md3dDevice.Get(),
-			mCommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
-
+			mCommandList.Get(), mesh.Vertices.data(), vbByteSize, geo->VertexBufferUploader);
 		geo->IndexBufferGPU = D3DUtils::CreateDefaultBuffer(md3dDevice.Get(),
-			mCommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
+			mCommandList.Get(), mesh.Indices32.data(), ibByteSize, geo->IndexBufferUploader);
 
 		geo->VertexByteStride = sizeof(Vertex);
 		geo->VertexBufferByteSize = vbByteSize;
 		geo->IndexFormat = DXGI_FORMAT_R32_UINT;
 		geo->IndexBufferByteSize = ibByteSize;
-		geo->IndexCount = (UINT)tempMesh.Indices32.size();
+		geo->IndexCount = (UINT)mesh.Indices32.size();
 		geo->Bounds = bounds;
 		mGeometries[geo->Name] = std::move(geo);
 	}
@@ -1021,6 +949,7 @@ void Engine::CalculateFrameStats()
 
 void Engine::Pick(int x, int y)
 {
+	/*
 	XMFLOAT4X4 P = mCamera.GetProj4x4f();
 	float vx = (+2.0f*x / mClientWidth - 1.0f) / P(0, 0);
 	float vy = (-2.0f*y / mClientHeight + 1.0f) / P(1, 1);
@@ -1029,12 +958,13 @@ void Engine::Pick(int x, int y)
 	std::vector<int> toRemove;
 	XMFLOAT3 hitPos(0, 0, 0);
 
-	for (int i = 0; i < mOpaqueRitems.size(); ++i)
+	for (int i = 0; i < mWorldObjects.size(); ++i)
 	{
 
+		/*
 		XMVECTOR rayOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 		XMVECTOR rayDir = XMVectorSet(vx, vy, 1.0f, 0.0f);
-		auto ri = mOpaqueRitems[i];
+		auto ri = mWorldObjects[i]->ri.get();
 		XMMATRIX W = XMLoadFloat4x4(&ri->World);
 		XMMATRIX invWorld = XMMatrixInverse(&XMMatrixDeterminant(W), W);
 		// Tranform ray to vi space of Mesh.
@@ -1088,12 +1018,13 @@ void Engine::Pick(int x, int y)
 	{
 		std::swap(mOpaqueRitems[i], mOpaqueRitems.back());
 		mOpaqueRitems.pop_back();
-	}*/
+	}
 	XMMATRIX trans = XMMatrixTranslation(hitPos.x, hitPos.y, hitPos.z);
 	XMMATRIX world = XMLoadFloat4x4(&MathUtils::Identity4x4());
 
 	XMStoreFloat4x4(&mOpaqueRitems[0]->World, XMMatrixMultiply(trans, world));
 	mOpaqueRitems[0]->NumFramesDirty = mNumFrameResources;
+	*/
 }
 
 void Engine::Update()
@@ -1112,12 +1043,12 @@ void Engine::Update()
 		CloseHandle(eventHandle);
 	}
 
-	for (auto& e : mAllObjects)
-	{
-	//	mPhysicsEngine.Update(e.get(), mCurrentObjects, mTimer);
-		
-	}
+//	for (auto& e : mAllObjects)
+//	{
+	//	mPhysicsEngine.Update(e.get(), mCurrentObjects, mTimer); TODO reimplement physics better	
+	//}
 	//mPhysicsEngine.Reset(mCurrentObjects);
+
 	UpdateObjectCBs();
 	UpdateMaterialPassCBs();
 	UpdateMainPassCB();
@@ -1142,13 +1073,10 @@ void Engine::OnKeyboardInput()
 	}
 	if (GetAsyncKeyState('3') & 0x8000)
 	{
-		for (auto& e : mAllObjects)
+		for (auto& e : mWorldObjects)
 		{
-			XMMATRIX trans = XMMatrixRotationY(1 * mTimer.DeltaTime());
-			XMMATRIX world = XMLoadFloat4x4(&e->ri->World);
-			XMStoreFloat4x4(&e->ri->World, XMMatrixMultiply(trans, world));
-			e->ri->NumFramesDirty++;
-		//	mPhysicsEngine.Update(e.get(), mCurrentObjects, mTimer);
+			e->rotation.y += (40 * mTimer.DeltaTime());
+			e->UpdateWorld();
 		}
 	}
 
@@ -1210,15 +1138,15 @@ void Engine::UpdateCamera()
 void Engine::UpdateObjectCBs()
 {
 	auto currObjectCB = mCurrFrameResource->ObjectCB.get();
-	for (auto& e : mAllObjects)
+	for (auto& e : mWorldObjects)
 	{
 		if (e->ri->NumFramesDirty > 0)
 		{
-			XMMATRIX world = XMLoadFloat4x4(&e->ri->World);
+			XMMATRIX world = XMLoadFloat4x4(&e->World);
 			ObjectConstants objConstants;
 			XMStoreFloat4x4(&objConstants.World, XMMatrixTranspose(world));
 			currObjectCB->CopyData(e->ri->ObjCBIndex, objConstants);
-			e->ri->NumFramesDirty = mNumFrameResources;//TODO
+			e->ri->NumFramesDirty = mNumFrameResources;
 		}
 	}
 }
@@ -1302,11 +1230,8 @@ void Engine::Draw()
 
 	auto passCB = mCurrFrameResource->PassCB->Resource();
 	mCommandList->SetGraphicsRootConstantBufferView(2, passCB->GetGPUVirtualAddress());
-	DrawRenderItems(mCommandList.Get(), mOpaqueRitems);
-	if (mRenderBoundingBoxes)
-	{
-		DrawBoundingBoxes(mCommandList.Get(), mCurrentObjects);
-	}
+	
+	DrawWorldItems(mCommandList.Get());
 
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -1320,7 +1245,7 @@ void Engine::Draw()
 	mCommandQueue->Signal(mFence.Get(), mCurrentFence);
 }
 
-void Engine::DrawRenderItems(ID3D12GraphicsCommandList * cmdList, const std::vector<RenderItem*>& ritems)
+void Engine::DrawWorldItems(ID3D12GraphicsCommandList * cmdList)
 {
 	UINT objCBByteSize = D3DUtils::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 	UINT matCBByteSize = D3DUtils::CalcConstantBufferByteSize(sizeof(MaterialConstants));
@@ -1329,9 +1254,9 @@ void Engine::DrawRenderItems(ID3D12GraphicsCommandList * cmdList, const std::vec
 	auto matCB = mCurrFrameResource->MaterialCB->Resource();
 
 	// For each render item...
-	for (size_t i = 0; i < ritems.size(); ++i)
+	for (size_t i = 0; i < mWorldObjects.size(); ++i)
 	{
-		auto ri = ritems[i];
+		auto ri = mWorldObjects[i]->ri.get();
 
 		cmdList->IASetVertexBuffers(0, 1, &ri->Geo->VertexBufferView());
 		cmdList->IASetIndexBuffer(&ri->Geo->IndexBufferView());
@@ -1347,53 +1272,6 @@ void Engine::DrawRenderItems(ID3D12GraphicsCommandList * cmdList, const std::vec
 		cmdList->SetGraphicsRootConstantBufferView(1, objCBAddress);
 		cmdList->SetGraphicsRootConstantBufferView(3, matCBAddress);
 
-		cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
+		cmdList->DrawIndexedInstanced(ri->Geo->IndexCount, 1, 0, 0, 0);
 	}
-}
-
-void Engine::DrawBoundingBoxes(ID3D12GraphicsCommandList * cmdList, const std::vector<Object*>& objects)
-{
-	cmdList->SetPipelineState(mPSOs["opaque_wireframe"].Get());
-	if (mBoundingBoxes.empty())
-	{
-		for (auto& obj : objects)
-		{
-			BoundingBox box = obj->po->bounds;
-			MeshData tempMesh;
-			GeometryGenerator::GenerateBoundingBoxRender(tempMesh.Vertices, tempMesh.Indices32, box);
-			auto geo = std::make_unique<MeshGeometry>();
-			geo->Name = "BoundingBox";
-			const UINT vbByteSize = (UINT)tempMesh.Vertices.size() * sizeof(Vertex);
-			const UINT ibByteSize = (UINT)tempMesh.Indices32.size() * sizeof(std::uint32_t);
-
-			ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
-			CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), tempMesh.Vertices.data(), vbByteSize);
-			ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
-			CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), tempMesh.Indices32.data(), ibByteSize);
-			geo->VertexBufferGPU = D3DUtils::CreateDefaultBuffer(md3dDevice.Get(),
-				mCommandList.Get(), tempMesh.Vertices.data(), vbByteSize, geo->VertexBufferUploader);
-			geo->IndexBufferGPU = D3DUtils::CreateDefaultBuffer(md3dDevice.Get(),
-				mCommandList.Get(), tempMesh.Indices32.data(), ibByteSize, geo->IndexBufferUploader);
-			geo->VertexByteStride = sizeof(Vertex);
-			geo->VertexBufferByteSize = vbByteSize;
-			geo->IndexFormat = DXGI_FORMAT_R32_UINT;
-			geo->IndexBufferByteSize = ibByteSize;
-			geo->IndexCount = (UINT)tempMesh.Indices32.size();
-			mGeometries["box"] = std::move(geo);
-			FlushCommandQueue();
-
-			auto rItem = std::make_unique<RenderItem>(mNumFrameResources);
-			rItem->ObjCBIndex = mAllObjects.size()+1;
-			rItem->Geo = mGeometries["box"].get();
-			rItem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-			rItem->Mat = mMaterials[obj->ri->Mat->Name].get();
-			rItem->IndexCount = rItem->Geo->IndexCount;
-			rItem->StartIndexLocation = 0;
-			rItem->BaseVertexLocation = 0;
-
-			mBoundingBoxes.push_back(rItem.get());
-		}
-	}
-	DrawRenderItems(mCommandList.Get(), mBoundingBoxes);
-//	mBoundingBoxes.clear();
 }

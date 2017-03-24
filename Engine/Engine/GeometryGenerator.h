@@ -7,8 +7,8 @@ public:
 	GeometryGenerator();
 	~GeometryGenerator();
 
-	static void GenerateGridMesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, uint16 width, uint16 height, float offset);
-	static void GenerateGridMeshPoly(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, uint16 width, uint16 height, float offset);
+	static void GenerateGridMesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, uint16_t width, uint16_t height, float offset);
+	static void GenerateGridMeshPoly(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, uint16_t width, uint16_t height, float offset);
 	static void GenerateBoundingBoxRender(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, BoundingBox box);
 	static void SetNormalsSame(Vertex& v1, Vertex& v2, Vertex& v3)
 	{
