@@ -1,0 +1,17 @@
+Default Scene 2 
+Textures{
+loops.dds
+white.dds
+}
+Models{
+mesh
+face.txt
+}
+Material {
+loops.dds,0,0,1,1,1,1,.01,.01,.01,.25
+white.dds,1,1,1,1,1,1,.01,.01,.01,.25
+}
+Objects{
+0,0,0,1,1,1,0,0,0,mesh,loops.dds,mesh,10,.65,1,0,1,0,0,0
+100,2,100,.1,.1,.1,180,180,0,face.txt,white.dds,face.txt,10,.65,1,0,1,0,0,0
+}

@@ -1,0 +1,18 @@
+Default Scene
+Textures{
+bricks.dds
+tile.dds
+}
+Models{
+skull.txt
+car.txt
+}
+Material {
+bricks.dds,0,0,1,1,1,1,.01,.01,.01,.25
+tile.dds,1,1,1,1,1,1,.01,.01,.01,.25
+}
+Objects{
+-10,0,0,1,1,1,1,1,1,skull.txt,bricks.dds,skull.txt,10,.65,1,0,1,0,0,0
+0,0,0,1,1,1,1,1,1,car.txt,tile.dds,car.txt,10,.65,1,0,1,0,0,0
+10,0,0,1,1,1,1,1,1,skull.txt,bricks.dds,skull.txt,10,.65,1,0,1,0,0,0
+}

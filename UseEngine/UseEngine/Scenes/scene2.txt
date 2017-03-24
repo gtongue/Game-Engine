@@ -1,0 +1,28 @@
+Default Scene 2 
+Textures{
+white.dds
+grass.dds
+converse.dds
+}
+Models{
+face.txt
+bucket.txt
+converse.txt
+man.txt
+tree.txt
+suitcase.txt
+house.txt
+}
+Material {
+white.dds,0,0,1,1,1,1,.01,.01,.01,.25
+grass.dds,1,1,1,1,1,1,.01,.01,.01,.25
+converse.dds,2,2,1,1,1,1,.01,.01,.01,.25
+}
+Objects{
+-300,-100,300,1,1,1,0,0,180,face.txt,white.dds,face.txt,10,.65,1,0,1,0,0,0
+-100,-100,300,1,1,1,0,0,180,bucket.txt,grass.dds,bucket.txt,10,.65,1,0,1,0,0,0
+0,-100,300,1,1,1,0,0,0,house.txt,converse.dds,house.txt,10,.65,1,0,1,0,0,0
+100,-100,300,1,1,1,0,0,0,man.txt,white.dds,man.txt,10,.65,1,0,1,0,0,0
+300,-100,300,1,1,1,0,0,180,tree.txt,grass.dds,tree.txt,10,.65,1,0,1,0,0,0
+500,-100,300,1,1,1,0,0,180,suitcase.txt,white.dds,suitcase.txt,10,.65,1,0,1,0,0,0
+}

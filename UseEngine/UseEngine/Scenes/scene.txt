@@ -1,0 +1,15 @@
+Default Scene 2 
+Textures{
+white.dds
+converse.dds
+}
+Models{
+face.txt
+}
+Material {
+white.dds,0,0,1,1,1,1,.01,.01,.01,.25
+converse.dds,1,1,1,1,1,1,.01,.01,.01,.25
+}
+Objects{
+0,10,0,2,2,2,0,90,90,face.txt,white.dds,face.txt,10,.65,1,0,1,0,0,0
+}
