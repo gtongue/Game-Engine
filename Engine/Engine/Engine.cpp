@@ -300,12 +300,14 @@ void Engine::BuildPSOs(Scene & scene)
 	opaquePsoDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
 	opaquePsoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
 	opaquePsoDesc.DSVFormat = mDepthStencilFormat;
-	//opaquePsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaquePsoDesc, IID_PPV_ARGS(&mPSOs["opaque"])));
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC opaqueWireframePsoDesc = opaquePsoDesc;
 	opaqueWireframePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+
+	//opaquePsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	//opaqueWireframePsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	//opaqueWireframePsoDesc.RasterizerState.FrontCounterClockwise = true;
+
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&opaqueWireframePsoDesc, IID_PPV_ARGS(&mPSOs["opaque_wireframe"])));
 }
 
@@ -949,23 +951,18 @@ void Engine::CalculateFrameStats()
 
 void Engine::Pick(int x, int y)
 {
-	/*
 	XMFLOAT4X4 P = mCamera.GetProj4x4f();
 	float vx = (+2.0f*x / mClientWidth - 1.0f) / P(0, 0);
 	float vy = (-2.0f*y / mClientHeight + 1.0f) / P(1, 1);
 	XMMATRIX V = mCamera.GetView();
 	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(V), V);
-	std::vector<int> toRemove;
-	XMFLOAT3 hitPos(0, 0, 0);
 
 	for (int i = 0; i < mWorldObjects.size(); ++i)
 	{
-
-		/*
 		XMVECTOR rayOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 		XMVECTOR rayDir = XMVectorSet(vx, vy, 1.0f, 0.0f);
-		auto ri = mWorldObjects[i]->ri.get();
-		XMMATRIX W = XMLoadFloat4x4(&ri->World);
+		auto wo = mWorldObjects[i].get();
+		XMMATRIX W = XMLoadFloat4x4(&wo->World);
 		XMMATRIX invWorld = XMMatrixInverse(&XMMatrixDeterminant(W), W);
 		// Tranform ray to vi space of Mesh.
 		XMMATRIX toLocal = XMMatrixMultiply(invView, invWorld);
@@ -974,6 +971,12 @@ void Engine::Pick(int x, int y)
 		// Make the ray direction unit length for the intersection tests.
 		rayDir = XMVector3Normalize(rayDir);
 		float tmin = 0.0f;
+		if (wo->ri->Geo->Bounds.Intersects(rayOrigin, rayDir, tmin))
+		{
+			OutputDebugStringA(wo->ri->Geo->Name.c_str());
+		}
+	}
+	/*
 		if (ri->Geo->Bounds.Intersects(rayOrigin, rayDir, tmin))
 		{
 			OutputDebugStringA(ri->Geo->Name.c_str());
